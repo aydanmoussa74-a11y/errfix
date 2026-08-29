@@ -3,53 +3,77 @@
 from __future__ import annotations
 
 from rich.console import Console
-from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.text import Text
 
-_console = Console()
+# color_system="auto" drops to plain text on dumb terminals / NO_COLOR.
+_console = Console(soft_wrap=True, highlight=False, color_system="auto")
 
 
 def render_solution(problem: str, fix: str) -> None:
-    """Print a two-panel view: the problem in bold red/yellow, the fix in green."""
-    problem_text = Text()
-    problem_text.append("PROBLEM\n", style="bold red")
-    problem_text.append(problem or "Unable to summarize this error.", style="bold yellow")
-
+    """Print two panels: [ERROR SUMMARY] then [PROPOSED FIX]."""
+    summary = Text(problem or "Unable to summarize this error.", style="bold yellow")
     _console.print(
         Panel(
-            problem_text,
-            border_style="red",
-            title="errfix",
+            summary,
+            title="[bold red][ERROR SUMMARY][/bold red]",
             title_align="left",
+            border_style="red",
+            padding=(1, 2),
         )
     )
 
-    code_like = _looks_like_code(fix)
-    if code_like:
-        body = Syntax(
+    if not fix:
+        fix_body: Text | Syntax = Text("No fix suggested.", style="dim")
+    else:
+        lexer = _detect_lexer(fix)
+        theme = "monokai" if _console.color_system else "ansi_light"
+        fix_body = Syntax(
             fix,
-            "python",
-            theme="monokai",
+            lexer,
+            theme=theme,
             line_numbers=False,
             word_wrap=True,
+            background_color="default",
         )
-    else:
-        body = Markdown(f"```python\n{fix}\n```") if fix else Text("No fix suggested.", style="dim")
 
     _console.print(
         Panel(
-            body,
-            border_style="green",
-            title="[bold green]FIX[/bold green]",
+            fix_body,
+            title="[bold green][PROPOSED FIX][/bold green]",
             title_align="left",
+            border_style="green",
+            padding=(1, 2),
+            style="cyan",
         )
     )
 
 
-def _looks_like_code(text: str) -> bool:
-    if not text:
-        return False
-    markers = ("def ", "class ", "import ", "return ", "=", "    ", "\t")
-    return any(token in text for token in markers)
+def _detect_lexer(text: str) -> str:
+    stripped = text.lstrip()
+    shell_prefixes = (
+        "$ ",
+        "# ",
+        "pip ",
+        "pip3 ",
+        "python ",
+        "python3 ",
+        "export ",
+        "cd ",
+        "npm ",
+        "npx ",
+        "cargo ",
+        "go ",
+        "curl ",
+        "sudo ",
+        "apt ",
+        "brew ",
+    )
+    if stripped.startswith(shell_prefixes) or stripped.startswith(("git ", "make ")):
+        return "bash"
+    if any(token in text for token in ("def ", "class ", "import ", "return ", "    ")):
+        return "python"
+    if stripped.startswith(("function ", "const ", "let ", "var ", "export ")):
+        return "javascript"
+    return "text"
