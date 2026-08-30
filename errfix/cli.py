@@ -8,9 +8,16 @@ import sys
 from pathlib import Path
 
 import click
+from rich.panel import Panel
+from rich.text import Text
 
 from errfix import __version__
-from errfix.display import analyze_with_status, render_solution, report_rc_permission_error
+from errfix.display import (
+    analyze_with_status,
+    console,
+    render_solution,
+    report_rc_permission_error,
+)
 from errfix.llm import explain_error
 from errfix.sanitizer import clean_stack_trace
 
@@ -27,6 +34,27 @@ def _read_input(trace: tuple[str, ...]) -> str:
     if trace:
         return " ".join(trace)
     return ""
+
+
+def _show_usage_and_exit() -> None:
+    body = Text()
+    body.append("errfix needs a stack trace. Pipe a failing command or pass text.\n\n", style="bold yellow")
+    body.append("Examples\n", style="bold cyan")
+    body.append("  python app.py 2>&1 | errfix\n")
+    body.append("  node server.js 2>&1 | errfix\n")
+    body.append("  go run . 2>&1 | errfix\n")
+    body.append("  cargo run 2>&1 | errfix\n")
+    body.append("  errfix 'Traceback (most recent call last): ...'\n")
+    console.print(
+        Panel(
+            body,
+            title="[bold red]USAGE[/bold red]",
+            title_align="left",
+            border_style="cyan",
+            padding=(1, 2),
+        )
+    )
+    raise SystemExit(0)
 
 
 def _read_saved_key() -> str:
@@ -104,7 +132,6 @@ def resolve_api_key(reset_key: bool) -> str:
         os.environ["ERRFIX_API_KEY"] = saved
         return saved
 
-    # rc unreadable: fall back to env (already empty) then prompt, but never crash
     key = _prompt_key("ERRFIX_API_KEY not found. Enter key to save to ~/.errfixrc:")
     if not key:
         click.echo("errfix: empty key, aborting.", err=True)
@@ -128,18 +155,19 @@ def main(reset_key: bool, trace: tuple[str, ...]) -> None:
     Pipe a process:  python script.py 2>&1 | errfix
     Or pass text:    errfix 'Traceback (most recent call last): ...'
     """
+    if sys.stdin.isatty() and not trace:
+        if reset_key:
+            resolve_api_key(True)
+            return
+        _show_usage_and_exit()
+
     resolve_api_key(reset_key)
 
     raw_text = _read_input(trace)
     if not raw_text.strip():
         if reset_key:
             return
-        click.echo(
-            "errfix: no stack trace received. Pipe output or pass text as arguments.\n"
-            "Example: python script.py 2>&1 | errfix",
-            err=True,
-        )
-        raise SystemExit(1)
+        _show_usage_and_exit()
 
     cleaned = clean_stack_trace(raw_text)
     result = analyze_with_status(lambda: explain_error(cleaned))

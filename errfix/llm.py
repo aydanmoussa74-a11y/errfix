@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 import httpx
 
@@ -41,6 +42,12 @@ def explain_error(cleaned_trace: str) -> dict:
         response.raise_for_status()
         data = response.json()
         content = data["choices"][0]["message"]["content"]
+        content = re.sub(
+            r"^```json\s*|\s*```$",
+            "",
+            content.strip(),
+            flags=re.MULTILINE,
+        )
         parsed = json.loads(content)
         return {
             "problem": parsed.get("problem", "Could not parse problem."),
