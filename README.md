@@ -1,46 +1,95 @@
-# -errfix
+# errfix ⚡
 
-![status](https://img.shields.io/badge/status-alpha-yellow)
-![python](https://img.shields.io/badge/python-3.8%2B-blue)
-![license](https://img.shields.io/badge/license-MIT-green)
+> Stop reading walls of red terminal text. `errfix` pipes cryptic stack traces
+> straight into lightweight AI for instant, 2-line problem breakdowns and
+> actionable fixes.
 
-Transform verbose, ugly terminal stack traces into instant 2-line solutions.
+![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Code Style](https://img.shields.io/badge/code%20style-rich-purple)
 
-`-errfix` is a zero-config CLI that reads a traceback from a pipe or argument,
-redacts local machine paths, and prints a short problem summary plus a suggested fix.
+---
+
+## Quick Demo
+
+```bash
+# Pipe any failing command directly into errfix
+python app.py 2>&1 | errfix
+```
+
+```text
+╭───────────────────── ERROR SUMMARY ─────────────────────╮
+│ IndexError: list index out of range at line 14          │
+│ You attempted to access index 3 on an empty list items. │
+╰────────────────────────────────────────────────────────╯
+╭────────────────────── PROPOSED FIX ─────────────────────╮
+│ Add a check before indexing:                            │
+│ if items:                                               │
+│     val = items[0]                                      │
+╰────────────────────────────────────────────────────────╯
+```
+
+## Key Features
+
+- **Multi-language support** — extracts and parses traces from Python, Node.js, Go, and Rust.
+- **Privacy first** — regex redacts local machine paths (`/Users/...`, `/home/...`, `C:\Users\...`) and home shortcuts before anything is sent.
+- **Rich terminal formatting** — syntax-highlighted panels that degrade to plain text when color is unavailable.
+- **Stdin protection** — TTY detection prints a usage panel and exits instead of hanging when there is no pipe.
+- **Persistent key storage** — prompts on first run and saves to `~/.errfixrc` (mode `0600`). Use `errfix --reset-key` to overwrite.
 
 ## Installation
 
 ```bash
-git clone https://github.com/aydanmoussa74-a11y/-errfix.git
-cd -errfix
+git clone https://github.com/aydanmoussa74-a11y/errfix.git
+cd errfix
 pip install -e .
 ```
 
-## Usage
+## Usage Examples
 
-Pipe a failing script:
+Python:
 
 ```bash
 python script.py 2>&1 | errfix
 ```
 
-Pass a captured traceback as arguments:
+Node.js / JavaScript:
 
 ```bash
-errfix 'Traceback (most recent call last): ...'
+node app.js 2>&1 | errfix
 ```
 
-Optional inference settings (otherwise a local heuristic is used):
+Go:
 
 ```bash
-export ERRFIX_API_KEY=sk-...
-export ERRFIX_API_URL=https://api.openai.com/v1/chat/completions
-export ERRFIX_MODEL=gpt-4o-mini
+go run . 2>&1 | errfix
 ```
 
-## How it works
+Rust / Cargo:
 
-1. `sanitizer` strips `/home/username/`, `/Users/username/`, and `C:\Users\username\` paths.
-2. `llm` asks an inference endpoint for a `{problem, fix}` pair.
-3. `display` renders the problem in red/yellow and the fix as a green code block.
+```bash
+cargo run 2>&1 | errfix
+```
+
+Reset API key:
+
+```bash
+errfix --reset-key
+```
+
+Optional inference settings:
+
+```bash
+export ERRFIX_API_KEY="your_key_here"
+export ERRFIX_API_URL="https://openrouter.ai/api/v1/chat/completions"
+export ERRFIX_MODEL="meta-llama/llama-3-8b-instruct:free"
+```
+
+## Technical Docs & Contributing
+
+- [ENGINEERING.md](ENGINEERING.md) — data pipeline, sanitizer rules, LLM constraints, and Rich rendering.
+- [CONTRIBUTING.md](CONTRIBUTING.md) — local setup, branch names, and pull-request guidelines.
+
+## License
+
+MIT © Zayd Moussa (2026)
