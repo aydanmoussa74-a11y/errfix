@@ -8,6 +8,8 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Code Style](https://img.shields.io/badge/code%20style-rich-purple)
 
+![errfix Demo](assets/demo.svg)
+
 ---
 
 ## Quick Demo
