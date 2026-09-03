@@ -1,3 +1,7 @@
+"""OpenAI-compatible LLM client with defensive response handling."""
+
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -5,12 +9,36 @@ import re
 import httpx
 
 
-def explain_error(cleaned_trace: str) -> dict:
+_JSON_FENCE = re.compile(r"^```(?:json)?\s*|\s*```$", re.IGNORECASE | re.MULTILINE)
+
+
+def _parse_json_content(content: object) -> dict[str, str]:
+    """Parse a model response and return only the fields the CLI renders."""
+    if not isinstance(content, str):
+        raise ValueError("model returned non-text content")
+
+    text = _JSON_FENCE.sub("", content.strip()).strip()
+    parsed = json.loads(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("model response was not a JSON object")
+
+    problem = parsed.get("problem")
+    fix = parsed.get("fix")
+    if not isinstance(problem, str) or not problem.strip():
+        raise ValueError("model response is missing a valid problem")
+    if not isinstance(fix, str) or not fix.strip():
+        raise ValueError("model response is missing a valid fix")
+
+    return {"problem": problem.strip(), "fix": fix.strip()}
+
+
+def explain_error(cleaned_trace: str) -> dict[str, str]:
+    """Send a sanitized trace to an OpenAI-compatible endpoint."""
     api_key = os.getenv("ERRFIX_API_KEY")
     if not api_key:
         return {
             "problem": "ERRFIX_API_KEY environment variable missing.",
-            "fix": "Run 'export ERRFIX_API_KEY=\"your_key_here\"' in your terminal.",
+            "fix": "Export ERRFIX_API_KEY in your shell or configure ~/.errfixrc.",
         }
 
     system_prompt = (
@@ -20,7 +48,6 @@ def explain_error(cleaned_trace: str) -> dict:
         "2. 'fix': The exact code modification or terminal command required to resolve it."
     )
 
-    # OpenAI-compatible (OpenRouter / Groq / OpenAI) chat completions
     url = os.getenv("ERRFIX_API_URL", "https://openrouter.ai/api/v1/chat/completions")
     model = os.getenv("ERRFIX_MODEL", "meta-llama/llama-3-8b-instruct:free")
     headers = {
@@ -42,19 +69,9 @@ def explain_error(cleaned_trace: str) -> dict:
         response.raise_for_status()
         data = response.json()
         content = data["choices"][0]["message"]["content"]
-        content = re.sub(
-            r"^```json\s*|\s*```$",
-            "",
-            content.strip(),
-            flags=re.MULTILINE,
-        )
-        parsed = json.loads(content)
+        return _parse_json_content(content)
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
         return {
-            "problem": parsed.get("problem", "Could not parse problem."),
-            "fix": parsed.get("fix", "No fix suggestion returned."),
-        }
-    except Exception as e:
-        return {
-            "problem": f"API request failed: {str(e)}",
-            "fix": "Check internet connectivity and API key validity.",
+            "problem": f"API response could not be processed: {exc}",
+            "fix": "Check the endpoint, model, API key, and network connection, then try again.",
         }
