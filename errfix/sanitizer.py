@@ -1,3 +1,7 @@
+"""Privacy-focused stack trace sanitization and extraction."""
+
+from __future__ import annotations
+
 import re
 
 _PY_TRACE = "Traceback (most recent call last):"
@@ -5,22 +9,29 @@ _GO_PANIC = re.compile(r"(?m)^panic:")
 _RUST_PANIC = re.compile(r"thread '.+' panicked")
 _JS_FRAME = re.compile(r"(?m)^\s+at\s+")
 _JS_ERROR = re.compile(
-    r"(?m)^(?:[A-Za-z]*Error|UnhandledPromiseRejectionWarning)\s*:",
+    r"(?m)^(?:[A-Za-z][A-Za-z0-9]*(?:Error|Exception)|UnhandledPromiseRejectionWarning)\s*:",
 )
+
+# Match common absolute paths while preserving the final filename. This is
+# intentionally conservative: URLs, hostnames, and ordinary error messages
+# should not be rewritten merely because they contain a slash.
+_ABS_PATH = re.compile(
+    r'(?P<prefix>(?:"|file\s+|file://)?)(?P<path>(?:[A-Za-z]:[\\/]|/)(?:[^:\n\r"\s]+[\\/])+)(?P<name>[^/\\\n\r"\s]+\.[A-Za-z0-9]+)',
+    re.IGNORECASE,
+)
+_HOME_PATH = re.compile(r"~(?:[/\\][^\s:'\"]*)?")
 
 
 def clean_stack_trace(raw_text: str) -> str:
+    """Redact local paths and retain the useful portion of a stack trace."""
     if not raw_text or not raw_text.strip():
         return ""
 
-    # Strip absolute POSIX & Windows paths, leaving relative filenames
-    cleaned = re.sub(
-        r'(?i)(?:"|file\s+|file://)?(?:[a-z]:\\|/)[^:\n\r]+[/\\]([^/\\]+\.[A-Za-z0-9]+)',
-        r"\1",
+    cleaned = _ABS_PATH.sub(
+        lambda match: f'{match.group("prefix")}{match.group("name")}',
         raw_text,
     )
-    # Sanitize home directory shortcuts
-    cleaned = re.sub(r"~[/\\][^\s:]+", "[HOME_DIR]", cleaned)
+    cleaned = _HOME_PATH.sub("[HOME_DIR]", cleaned)
 
     extracted = _extract_trace_block(cleaned)
     return extracted.strip()
