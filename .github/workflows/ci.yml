@@ -31,9 +31,8 @@ jobs:
       - name: Compile
         run: python -m compileall -q errfix
 
-      - name: Test
+      - name: Unit tests
         run: pytest -q
 
-      - name: CLI smoke test
-        run: |
-          printf '%s\n' 'Traceback (most recent call last):' '  File "/tmp/app.py", line 1, in <module>' 'NameError: name "x" is not defined' | python -m errfix.cli --help >/dev/null || true
+      - name: CLI help smoke test
+        run: errfix --help
