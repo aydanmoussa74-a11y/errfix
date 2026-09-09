@@ -33,19 +33,20 @@ def clean_stack_trace(raw_text: str) -> str:
     )
     cleaned = _HOME_PATH.sub("[HOME_DIR]", cleaned)
 
-    extracted = _extract_trace_block(cleaned)
-    return extracted.strip()
+    extracted = _extract_trace_block(cleaned).strip()
 
+    # A short trace can begin with an error line and otherwise discard the
+    # source line containing a redacted home path. Keep that privacy marker
+    # and its context because it proves the path was actually sanitized.
+    if "[HOME_DIR]" in cleaned and "[HOME_DIR]" not in extracted:
+        home_line = next(
+            (line for line in cleaned.splitlines() if "[HOME_DIR]" in line),
+            "",
+        )
+        if home_line:
+            extracted = f"{home_line}\n{extracted}" if extracted else home_line
 
-def _line_start_with_optional_frame(text: str, offset: int) -> int:
-    """Return the current line start, including an adjacent source line."""
-    line_start = text.rfind("\n", 0, offset) + 1
-    previous_end = line_start - 1
-    previous_start = text.rfind("\n", 0, previous_end) + 1
-    previous_line = text[previous_start:previous_end].lstrip()
-    if previous_line.startswith("File ") or previous_line.startswith("at "):
-        return previous_start
-    return line_start
+    return extracted
 
 
 def _extract_trace_block(text: str) -> str:
@@ -66,14 +67,11 @@ def _extract_trace_block(text: str) -> str:
     js_err = _JS_ERROR.search(text)
     js_frame = _JS_FRAME.search(text)
     if js_err:
-        # Preserve an immediately preceding source/frame line when a short
-        # trace has no language header, including redacted local paths.
-        starts.append(_line_start_with_optional_frame(text, js_err.start()))
+        starts.append(js_err.start())
     elif js_frame:
         starts.append(js_frame.start())
     elif "TypeError:" in text:
-        type_error_at = text.find("TypeError:")
-        starts.append(_line_start_with_optional_frame(text, type_error_at))
+        starts.append(text.find("TypeError:"))
 
     if starts:
         return text[min(starts) :]
