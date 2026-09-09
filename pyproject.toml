@@ -16,3 +16,7 @@ dependencies = [
 
 [project.scripts]
 errfix = "errfix.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["errfix*"]
+exclude = ["assets*"]
