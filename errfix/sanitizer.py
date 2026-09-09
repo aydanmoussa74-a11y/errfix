@@ -37,6 +37,17 @@ def clean_stack_trace(raw_text: str) -> str:
     return extracted.strip()
 
 
+def _line_start_with_optional_frame(text: str, offset: int) -> int:
+    """Return the current line start, including an adjacent source line."""
+    line_start = text.rfind("\n", 0, offset) + 1
+    previous_end = line_start - 1
+    previous_start = text.rfind("\n", 0, previous_end) + 1
+    previous_line = text[previous_start:previous_end].lstrip()
+    if previous_line.startswith("File ") or previous_line.startswith("at "):
+        return previous_start
+    return line_start
+
+
 def _extract_trace_block(text: str) -> str:
     starts = []
 
@@ -55,16 +66,14 @@ def _extract_trace_block(text: str) -> str:
     js_err = _JS_ERROR.search(text)
     js_frame = _JS_FRAME.search(text)
     if js_err:
-        # Keep an immediately preceding source/frame line so redacted path
-        # context is not discarded when a short trace has no language header.
-        line_start = text.rfind("\n", 0, js_err.start()) + 1
-        starts.append(line_start)
+        # Preserve an immediately preceding source/frame line when a short
+        # trace has no language header, including redacted local paths.
+        starts.append(_line_start_with_optional_frame(text, js_err.start()))
     elif js_frame:
         starts.append(js_frame.start())
     elif "TypeError:" in text:
         type_error_at = text.find("TypeError:")
-        line_start = text.rfind("\n", 0, type_error_at) + 1
-        starts.append(line_start)
+        starts.append(_line_start_with_optional_frame(text, type_error_at))
 
     if starts:
         return text[min(starts) :]
