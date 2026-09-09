@@ -55,11 +55,16 @@ def _extract_trace_block(text: str) -> str:
     js_err = _JS_ERROR.search(text)
     js_frame = _JS_FRAME.search(text)
     if js_err:
-        starts.append(js_err.start())
+        # Keep an immediately preceding source/frame line so redacted path
+        # context is not discarded when a short trace has no language header.
+        line_start = text.rfind("\n", 0, js_err.start()) + 1
+        starts.append(line_start)
     elif js_frame:
         starts.append(js_frame.start())
     elif "TypeError:" in text:
-        starts.append(text.find("TypeError:"))
+        type_error_at = text.find("TypeError:")
+        line_start = text.rfind("\n", 0, type_error_at) + 1
+        starts.append(line_start)
 
     if starts:
         return text[min(starts) :]
