@@ -19,8 +19,8 @@
 ## Quick Demo
 
 ```bash
-# Pipe any failing command directly into errfix
-python app.py 2>&1 | errfix
+# Pipe a failing Python command into the installed errfix CLI
+python -c 'raise ValueError("demo error")' 2>&1 | errfix
 ```
 
 ```text
