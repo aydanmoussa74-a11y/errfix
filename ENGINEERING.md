@@ -16,10 +16,10 @@ stderr / argv  →  sanitizer  →  llm client  →  rich display
 
 ## Stdin IPC
 
-The intended invocation is a pipe:
+The intended invocation is a pipe through the installed `errfix` console script:
 
 ```bash
-python app.py 2>&1 | errfix
+python -c 'raise ValueError("demo error")' 2>&1 | errfix
 ```
 
 `cli._read_input` treats a non-TTY stdin as the source of truth and only falls back to positional arguments when the pipe is empty.
