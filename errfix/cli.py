@@ -40,7 +40,7 @@ def _show_usage_and_exit() -> None:
     body = Text()
     body.append("errfix needs a stack trace. Pipe a failing command or pass text.\n\n", style="bold yellow")
     body.append("Examples\n", style="bold cyan")
-    body.append("  python app.py 2>&1 | errfix\n")
+    body.append("  python -c 'raise ValueError(\"demo error\")' 2>&1 | errfix\n")
     body.append("  node server.js 2>&1 | errfix\n")
     body.append("  go run . 2>&1 | errfix\n")
     body.append("  cargo run 2>&1 | errfix\n")
